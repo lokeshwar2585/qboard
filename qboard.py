@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-Qboard - Queue your clipboard
-Copy multiple items, paste in order (FIFO)
-"""
-
 import pyperclip
 import threading
 import time
@@ -30,14 +25,17 @@ class Qboard:
         
         # Colors based on mode
         if self.mode == 'copy':
+            # Blue gradient for copy mode
             color1 = (41, 128, 185)
             color2 = (52, 152, 219)
             symbol_color = 'white'
         elif self.mode == 'paste':
+            # Green gradient for paste mode
             color1 = (39, 174, 96)
             color2 = (46, 204, 113)
             symbol_color = 'white'
         else:
+            # Sleek gray for inactive
             color1 = (52, 73, 94)
             color2 = (52, 73, 94)
             symbol_color = 'white'
@@ -45,27 +43,38 @@ class Qboard:
         image = Image.new('RGBA', (width, height), color=(255, 255, 255, 0))
         dc = ImageDraw.Draw(image)
         
-        # Draw modern rounded square
+        # Draw modern rounded square with gradient effect
+        # Main shape
         dc.rounded_rectangle([4, 4, width-4, height-4], radius=12, fill=color2)
+        
+        # Inner highlight for depth
         dc.rounded_rectangle([8, 8, width-8, height-8], radius=10, outline=color1, width=2)
         
         # Draw symbol based on mode
         if self.mode == 'copy':
             # Download/Copy arrow pointing down
+            # Arrow shaft
             dc.rectangle([28, 18, 36, 38], fill=symbol_color)
+            # Arrow head
             dc.polygon([32, 42, 24, 34, 40, 34], fill=symbol_color)
+            # Lines above (representing items)
             dc.rectangle([20, 12, 44, 14], fill=symbol_color)
             dc.rectangle([22, 16, 42, 18], fill=symbol_color)
             
         elif self.mode == 'paste':
             # Upload/Paste arrow pointing up
+            # Arrow head
             dc.polygon([32, 22, 24, 30, 40, 30], fill=symbol_color)
+            # Arrow shaft
             dc.rectangle([28, 26, 36, 46], fill=symbol_color)
+            # Lines below (representing destination)
             dc.rectangle([20, 50, 44, 52], fill=symbol_color)
             
         else:
             # Inactive - clipboard icon
+            # Clipboard body
             dc.rounded_rectangle([22, 26, 42, 50], radius=3, fill=symbol_color)
+            # Clipboard clip
             dc.rounded_rectangle([28, 20, 36, 28], radius=2, fill=symbol_color)
             dc.rounded_rectangle([30, 22, 34, 26], radius=1, fill=color2)
         
@@ -237,7 +246,7 @@ class Qboard:
     
     def quit_app(self):
         """Quit application"""
-        print("\n👋 Thanks for using Qboard!\n")
+        print("\n👋 Goodbye!\n")
         self.running = False
         if self.hotkey_listener:
             self.hotkey_listener.stop()
@@ -266,9 +275,9 @@ class Qboard:
     def run(self):
         """Start the application"""
         print("\n" + "="*60)
-        print("🚀 QBOARD - Queue Your Clipboard")
+        print("🚀 CLIPBOARD QUEUE TOOL")
         print("="*60)
-        print("\n👀 Icon in menu bar (top-right)")
+        print("\n✨ Cool icon in menu bar (top-right)")
         print("   • Gray clipboard = Inactive")
         print("   • Blue arrow down = Copy Mode")  
         print("   • Green arrow up = Paste Mode")
@@ -284,7 +293,7 @@ class Qboard:
         self.icon = Icon(
             "Qboard",
             self.create_icon_image(),
-            "Qboard - Queue Your Clipboard",
+            "Clipboard Queue",
             self.create_menu()
         )
         
