@@ -55,7 +55,7 @@ chmod +x install.sh
 python3 qboard.py
 
 
-🎨 Icon Guide
+### 🎨 Icon Guide
 The menu bar icon changes color based on mode:
 
 Gray Clipboard 📋 - Inactive (idle)
@@ -63,12 +63,12 @@ Blue Arrow Down ⬇️ - Copy Mode (collecting items)
 Green Arrow Up ⬆️ - Paste Mode (ready to paste)
 
 
-🤝 Contributing
+### 🤝 Contributing
 Contributions welcome! This started as a personal tool but I'm happy to improve it.
 
 🐛 Bug reports: Open an issue
 💡 Feature ideas: Open an issue with your idea
 
-Made with ❤️ by Sai Lokeshwar
+Made with ❤️ by SL
 
 Queue your clipboard, paste with ease! 🚀
