@@ -28,7 +28,6 @@ Paste A → Load next → Paste B → Load next → Paste C
 
 - 📥 **Copy Mode**: Automatically captures everything you copy (Cmd+C)
 - 📤 **Paste Mode**: Paste items in the exact order you copied them
-- ⌨️ **Quick Hotkey**: `Cmd+Shift+N` loads next item
 - 🎨 **Menu Bar Icon**: Color-coded status (Gray/Blue/Green)
 - 🔄 **Simple Controls**: Start, stop, clear queue anytime
 - 🆓 **Free & Open Source**: MIT License
@@ -44,7 +43,7 @@ Paste A → Load next → Paste B → Load next → Paste C
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/qboard.git
+git clone https://github.com/lokeshwar2585/qboard.git
 cd qboard
 
 # Install dependencies
