@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
+"""
+Qboard - Queue your clipboard
+Copy multiple items, paste in order (FIFO)
+"""
+
 import pyperclip
 import threading
 import time
-from pynput.keyboard import GlobalHotKeys
 from pystray import Icon, Menu, MenuItem
 from PIL import Image, ImageDraw
 import sys
+
 
 class Qboard:
     def __init__(self):
@@ -16,26 +21,21 @@ class Qboard:
         self.running = True
         self.icon = None
         self.monitor_thread = None
-        self.hotkey_listener = None
         
     def create_icon_image(self):
-        """Create a cool modern icon"""
+        """Create menu bar icon"""
         width = 64
         height = 64
         
-        # Colors based on mode
         if self.mode == 'copy':
-            # Blue gradient for copy mode
             color1 = (41, 128, 185)
             color2 = (52, 152, 219)
             symbol_color = 'white'
         elif self.mode == 'paste':
-            # Green gradient for paste mode
             color1 = (39, 174, 96)
             color2 = (46, 204, 113)
             symbol_color = 'white'
         else:
-            # Sleek gray for inactive
             color1 = (52, 73, 94)
             color2 = (52, 73, 94)
             symbol_color = 'white'
@@ -43,189 +43,159 @@ class Qboard:
         image = Image.new('RGBA', (width, height), color=(255, 255, 255, 0))
         dc = ImageDraw.Draw(image)
         
-        # Draw modern rounded square with gradient effect
-        # Main shape
         dc.rounded_rectangle([4, 4, width-4, height-4], radius=12, fill=color2)
-        
-        # Inner highlight for depth
         dc.rounded_rectangle([8, 8, width-8, height-8], radius=10, outline=color1, width=2)
         
-        # Draw symbol based on mode
         if self.mode == 'copy':
-            # Download/Copy arrow pointing down
-            # Arrow shaft
             dc.rectangle([28, 18, 36, 38], fill=symbol_color)
-            # Arrow head
             dc.polygon([32, 42, 24, 34, 40, 34], fill=symbol_color)
-            # Lines above (representing items)
             dc.rectangle([20, 12, 44, 14], fill=symbol_color)
             dc.rectangle([22, 16, 42, 18], fill=symbol_color)
             
         elif self.mode == 'paste':
-            # Upload/Paste arrow pointing up
-            # Arrow head
             dc.polygon([32, 22, 24, 30, 40, 30], fill=symbol_color)
-            # Arrow shaft
             dc.rectangle([28, 26, 36, 46], fill=symbol_color)
-            # Lines below (representing destination)
             dc.rectangle([20, 50, 44, 52], fill=symbol_color)
             
         else:
-            # Inactive - clipboard icon
-            # Clipboard body
             dc.rounded_rectangle([22, 26, 42, 50], radius=3, fill=symbol_color)
-            # Clipboard clip
             dc.rounded_rectangle([28, 20, 36, 28], radius=2, fill=symbol_color)
             dc.rounded_rectangle([30, 22, 34, 26], radius=1, fill=color2)
         
         return image
     
     def create_menu(self):
-        """Create menu for tray icon"""
+        """Create menu bar menu"""
         queue_count = len(self.queue)
         remaining = queue_count - self.paste_index
         
         if self.mode == 'paste' and remaining > 0:
             return Menu(
                 MenuItem(
-                    f'📤 NEXT ITEM ({remaining} left) ⌘⇧N', 
-                    self.load_next_for_pasting,
+                    f'Next Item ({remaining} left)', 
+                    self.load_next_item,
                     default=True
                 ),
                 Menu.SEPARATOR,
-                MenuItem('⏹️ Stop Paste Mode', self.deactivate),
-                MenuItem('🗑️ Clear Queue', self.clear_queue),
+                MenuItem('Stop', self.deactivate),
+                MenuItem('Clear Queue', self.clear_queue),
                 Menu.SEPARATOR,
                 MenuItem(f'Total: {queue_count} | Pasted: {self.paste_index}', None, enabled=False),
                 Menu.SEPARATOR,
-                MenuItem('❌ Quit', self.quit_app)
+                MenuItem('Quit', self.quit_app)
             )
         else:
             return Menu(
                 MenuItem(
-                    '📥 Copy Mode', 
+                    'Copy Mode', 
                     self.activate_copy_mode,
                     checked=lambda item: self.mode == 'copy'
                 ),
                 MenuItem(
-                    '📤 Paste Mode', 
+                    'Paste Mode', 
                     self.activate_paste_mode,
                     enabled=lambda item: queue_count > 0
                 ),
                 MenuItem(
-                    '⏹️ Stop', 
+                    'Stop', 
                     self.deactivate, 
                     enabled=lambda item: self.mode != 'inactive'
                 ),
                 Menu.SEPARATOR,
-                MenuItem(f'📋 Queue: {queue_count} items', None, enabled=False),
-                MenuItem(f'✅ Pasted: {self.paste_index} items', None, enabled=False),
+                MenuItem(f'Queue: {queue_count} | Pasted: {self.paste_index}', None, enabled=False),
                 Menu.SEPARATOR,
-                MenuItem(
-                    '🗑️ Clear Queue', 
-                    self.clear_queue, 
-                    enabled=lambda item: queue_count > 0
-                ),
-                MenuItem('❌ Quit', self.quit_app)
+                MenuItem('Clear Queue', self.clear_queue, enabled=lambda item: queue_count > 0),
+                MenuItem('Quit', self.quit_app)
             )
     
     def update_icon(self):
-        """Update icon appearance and menu"""
+        """Update icon and menu"""
         if self.icon:
             self.icon.icon = self.create_icon_image()
             self.icon.menu = self.create_menu()
     
     def activate_copy_mode(self):
         """Activate copy mode"""
-        print("\n" + "🔵"*30)
-        print("📥 COPY MODE ACTIVATED!")
-        print("Copy items anywhere (Cmd+C)")
-        print("🔵"*30 + "\n")
-        
         self.mode = 'copy'
         self.paste_index = 0
         self.last_clipboard = pyperclip.paste()
         self.update_icon()
         
-        self.monitor_thread = threading.Thread(target=self.monitor_clipboard_copy, daemon=True)
+        print("\nCopy Mode: Active")
+        print("Copy items using Cmd+C\n")
+        
+        self.monitor_thread = threading.Thread(target=self.monitor_clipboard, daemon=True)
         self.monitor_thread.start()
     
     def activate_paste_mode(self):
         """Activate paste mode"""
         if len(self.queue) == 0:
-            print("\n⚠️  Queue is empty!\n")
+            print("Queue is empty")
             return
-        
-        print("\n" + "🟢"*30)
-        print("📤 PASTE MODE ACTIVATED!")
-        print(f"Queue has {len(self.queue)} items ready")
-        print("\n📋 WORKFLOW:")
-        print("  1. Press Cmd+V → pastes first item")
-        print("  2. Press Cmd+Shift+N → loads next item")
-        print("  3. Press Cmd+V → pastes it")
-        print("  4. Repeat 2-3 until done!")
-        print("\n⚡ Pattern: Cmd+V, Cmd+Shift+N, Cmd+V, Cmd+Shift+N...")
-        print("🟢"*30 + "\n")
         
         self.mode = 'paste'
         self.paste_index = 0
         self.update_icon()
         
-        # Load first item immediately
+        # Load first item
         item = self.queue[0]
         pyperclip.copy(item)
-        preview = item[:60].replace('\n', ' ')
         
-        print(f"✅ Item #1 READY: \"{preview}...\"")
-        print(f"👉 Press Cmd+V to paste it! ({len(self.queue) - 1} remaining)\n")
+        print(f"\nPaste Mode: Active")
+        print(f"Queue: {len(self.queue)} items")
+        print(f"Item 1 ready - press Cmd+V to paste\n")
         
         self.paste_index = 1
         self.update_icon()
     
-    def load_next_for_pasting(self):
-        """Load next item to clipboard for pasting"""
+    def load_next_item(self):
+        """Load next item to clipboard"""
         if self.mode != 'paste':
             return
         
         if self.paste_index >= len(self.queue):
-            print("\n" + "🎉"*30)
-            print("ALL ITEMS PASTED! Queue complete!")
-            print("🎉"*30 + "\n")
-            self.deactivate()
+            print("All items pasted!")
+            print("Switching back to Copy Mode\n")
             self.queue = []
             self.paste_index = 0
-            self.update_icon()
+            self.activate_copy_mode()
             return
         
-        # Load item to clipboard
+        # Load the item
         item = self.queue[self.paste_index]
         pyperclip.copy(item)
         
         remaining = len(self.queue) - self.paste_index - 1
-        preview = item[:60].replace('\n', ' ')
-        
-        print(f"✅ Item #{self.paste_index + 1} loaded: \"{preview}...\"")
-        print(f"👉 Press Cmd+V to paste it! ({remaining} remaining)\n")
+        print(f"Item {self.paste_index + 1} ready - press Cmd+V to paste ({remaining} remaining)")
         
         self.paste_index += 1
-        self.update_icon()
+        
+        # Check if that was the last item
+        if self.paste_index >= len(self.queue):
+            print("\nAll items pasted!")
+            print("Switching back to Copy Mode\n")
+            self.queue = []
+            self.paste_index = 0
+            self.activate_copy_mode()
+        else:
+            self.update_icon()
     
     def deactivate(self):
         """Stop current mode"""
-        print("\n⏹️  STOPPED\n")
         self.mode = 'inactive'
         self.update_icon()
+        print("Stopped\n")
     
     def clear_queue(self):
-        """Clear the queue"""
+        """Clear queue"""
         count = len(self.queue)
         self.queue = []
         self.paste_index = 0
-        print(f"\n🗑️  Cleared {count} items\n")
         self.update_icon()
+        print(f"Cleared {count} items\n")
     
-    def monitor_clipboard_copy(self):
-        """Monitor clipboard in COPY mode"""
+    def monitor_clipboard(self):
+        """Monitor clipboard in copy mode"""
         while self.mode == 'copy' and self.running:
             try:
                 current = pyperclip.paste()
@@ -234,81 +204,61 @@ class Qboard:
                     self.queue.append(current)
                     self.last_clipboard = current
                     
-                    preview = current[:60].replace('\n', ' ')
-                    print(f"✅ Added #{len(self.queue)}: \"{preview}...\"")
+                    preview = current[:50].replace('\n', ' ')
+                    if len(current) > 50:
+                        preview += "..."
                     
+                    print(f"Added item {len(self.queue)}: {preview}")
                     self.update_icon()
                     
-            except Exception as e:
+            except Exception:
                 pass
             
             time.sleep(0.3)
     
     def quit_app(self):
         """Quit application"""
-        print("\n👋 Goodbye!\n")
         self.running = False
-        if self.hotkey_listener:
-            self.hotkey_listener.stop()
         if self.icon:
             self.icon.stop()
+        print("Goodbye\n")
         sys.exit(0)
     
-    def start_hotkey_listener(self):
-        """Start global hotkey listener for Cmd+Shift+N"""
-        print("⌨️  Setting up hotkey: Cmd+Shift+N...")
-        
-        try:
-            hotkeys = {
-                '<cmd>+<shift>+n': self.load_next_for_pasting,
-                '<cmd>+<shift>+N': self.load_next_for_pasting,
-            }
-            
-            self.hotkey_listener = GlobalHotKeys(hotkeys)
-            self.hotkey_listener.start()
-            print("✅ Hotkey Cmd+Shift+N is active!\n")
-            
-        except Exception as e:
-            print(f"⚠️  Hotkey setup failed: {e}")
-            print("💡 You can still use the menu icon\n")
-    
     def run(self):
-        """Start the application"""
-        print("\n" + "="*60)
-        print("🚀 CLIPBOARD QUEUE TOOL")
-        print("="*60)
-        print("\n✨ Cool icon in menu bar (top-right)")
-        print("   • Gray clipboard = Inactive")
-        print("   • Blue arrow down = Copy Mode")  
-        print("   • Green arrow up = Paste Mode")
-        print("\n📋 HOW TO USE:")
-        print("   1. Click icon → Copy Mode")
-        print("   2. Copy: A, B, C (Cmd+C)")
-        print("   3. Click icon → Paste Mode")
-        print("   4. Cmd+V → A, Cmd+Shift+N, Cmd+V → B, etc.")
-        print("="*60 + "\n")
-        
-        self.start_hotkey_listener()
+        """Start application"""
+        print("\n" + "="*50)
+        print("Qboard - Queue Your Clipboard")
+        print("="*50)
+        print("\nMenu bar icon:")
+        print("  Gray = Inactive")
+        print("  Blue = Copy Mode")  
+        print("  Green = Paste Mode")
+        print("\nHow to use:")
+        print("  1. Click icon > Copy Mode")
+        print("  2. Copy items (Cmd+C)")
+        print("  3. Click icon > Paste Mode")
+        print("  4. Click Next Item, then Cmd+V to paste")
+        print("  5. Auto-switches to Copy Mode when done")
+        print("="*50 + "\n")
         
         self.icon = Icon(
             "Qboard",
             self.create_icon_image(),
-            "Clipboard Queue",
+            "Qboard",
             self.create_menu()
         )
         
-        print("🎯 Ready!\n")
+        print("Ready\n")
         self.icon.run()
+
 
 if __name__ == "__main__":
     try:
         app = Qboard()
         app.run()
     except KeyboardInterrupt:
-        print("\n👋 Goodbye!\n")
+        print("\nGoodbye\n")
         sys.exit(0)
     except Exception as e:
-        print(f"\n❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"\nError: {e}")
         sys.exit(1)
